@@ -1,3 +1,7 @@
+'''
+© 2020 Hotae Lee <hotae.lee@berkeley.edu>
+'''
+
 # Import packages.
 import cvxpy as cp
 import numpy as np
