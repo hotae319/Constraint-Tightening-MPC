@@ -7,7 +7,7 @@ import cvxpy as cp
 import numpy as np
 import matplotlib.pyplot as plt
 from set_operation import polytope
-from set_operation import pontryagin_diff, multiplication 
+from set_operation import pontryagin_diff, multiplication, polytope_intersection
 from agent import Agent
 
 class TighteningMPC:
@@ -157,9 +157,16 @@ if __name__ == "__main__":
     constr = mpc_policy.recursion_y()
     target = mpc_policy.recursion_target()    
     #print([constr[j].b for j in range(len(constr))])
-    AF = np.array([[1,0],[-1,0]])
-    bF = np.array([100,100])
-    XF = polytope(AF,bF)
+
+    # Get XF
+    constr_last = polytope(constr[-1].A@C, constr[-1].b)
+    target_last = polytope(target[-1].A@E, target[-1].b)
+    x2_zero = polytope(np.array([[0,1],[0,-1]]),np.array([0,0]))
+    XF = polytope_intersection(constr_last, target_last)
+    XF = polytope_intersection(XF, x2_zero)
+    # AF = np.array([[1,0],[-1,0]])
+    # bF = np.array([100,100])
+    # XF = polytope(AF,bF)
 
     # T step evolution    
     T = 20
@@ -173,10 +180,10 @@ if __name__ == "__main__":
         # MPC control policy
         mpc_policy.state_update(agent.x)
         u = mpc_policy.solve_mpc(target, constr, XF)        
-        print(u)
+        #print(u)
         # update with u_input
         u_input = u[:,0]
-        print(u_input)
+        #print(u_input)
         agent.x = agent.update(u_input, w_candidate[:,t])
         x1_list.append(agent.x[0])
         x2_list.append(agent.x[1])

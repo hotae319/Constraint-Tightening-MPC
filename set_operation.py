@@ -57,6 +57,23 @@ def multiplication(P, L):
     Mul = polytope(C, d)
     return Mul
 
+def max_invariant_set(P, A):
+    # P : Polytope, A : matrix of evolution 
+    max_iter = 100
+    for i in range(max_iter):
+        A_new = P.A*A
+        # get intersection
+    # get polytope
+    # P_inf = polytope(A_inf, b_inf)
+    return 1
+
+def polytope_intersection(P,Q):
+    # P,Q : polytopes
+    A_intersect = np.concatenate((P.A,Q.A),axis = 0)
+    b_intersect = np.concatenate((P.b,Q.b),axis = 0)
+    poly_new = polytope(A_intersect,b_intersect)
+    return poly_new 
+
 if __name__ == "__main__":
     A = np.array([[1, 0],[-1,0],[0,1],[0,-1]])
     b = np.array([6,-6,6,-6])
