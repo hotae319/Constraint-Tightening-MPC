@@ -20,7 +20,9 @@ class polytope:
 def solve_lp(c, A, b):
     # max cx s.t. Ax <= b
     x = cp.Variable((len(c),))
+    print(x.shape, A.shape, b.shape)
     cost = c@x
+
     constr = [A@x<=b]
     problem = cp.Problem(cp.Maximize(cost), constr)
     problem.solve()
@@ -32,6 +34,8 @@ def pontryagin_diff(P, Q):
     H = np.zeros((n,))
     for i in range(n):
         # solve LP to get H := max p^T x
+        print("P.A,Q.A,Q.b")
+        print(P.A[i], Q.A, Q.b)
         obj, x = solve_lp(P.A[i], Q.A, Q.b) 
         H[i] = obj
     #print(H)
@@ -54,6 +58,8 @@ def multiplication(P, L):
         d2 = np.squeeze(d2)
         C = np.concatenate((C1,C2),axis = 0)
         d = np.concatenate((d1,d2),axis = 0)
+        print("shape list")
+        print(C1.shape, d1.shape, C2.shape, d2.shape, C2_temp.shape, d2_temp.shape)
     Mul = polytope(C, d)
     return Mul
 

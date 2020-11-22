@@ -34,7 +34,7 @@ class TighteningMPC:
             L_cur = (self.A+self.B@self.K[i])@L_cur
             L.append(L_cur)
         return L
-    def recursion_target(self):     
+    def recursion_target(self,L):     
         target_cur = self.target_init
         target = [target_cur]
         for i in range(self.N):
@@ -42,14 +42,20 @@ class TighteningMPC:
             target_cur = pontryagin_diff(target_cur,W_temp)
             target.append(target_cur)
         return target
-    def recursion_y(self):
+    def recursion_y(self,L):
         constr_cur = self.constr_init
         constr = [constr_cur]
         for i in range(self.N):
+            # print("w, (c+dk)l\n")
+            # print(self.W.A, (self.C + self.D @ self.K[i])@L[i])
             W_temp = multiplication(self.W,(self.C + self.D @ self.K[i])@L[i])
+            # print("wtemp\n")
+            # print(W_temp.A,W_temp.b)
+            # print("constr")
+            # print(constr_cur.A,constr_cur.b)
             constr_cur = pontryagin_diff(constr_cur,W_temp)
             constr.append(constr_cur)
-            print("\n")
+            # print("\n")
         return constr
     def nilpotent_lqr(self, Q, R, M):
         # Q,R : LQR Gain
@@ -57,24 +63,24 @@ class TighteningMPC:
         K_seq = []        
         P = np.zeros((Q.shape))
         S = np.identity(self.B.T.shape[1]) 
-        print(A,B)
+        #print(A,B)
         for j in range(M-1,-1,-1):            
-            H1 = np.concatenate((R+B.T@P@B, B.T@S.T),axis=1)
-            H2 = np.concatenate((S@B,np.zeros(Q.shape)),axis=1)
+            H1 = np.concatenate((R+self.B.T@P@self.B, self.B.T@S.T),axis=1)
+            H2 = np.concatenate((S@self.B,np.zeros(Q.shape)),axis=1)
             H = np.concatenate((H1,H2),axis = 0)
             H_pseudo = np.linalg.pinv(H)
             # compute K
             #K = -np.concatenate((np.identity(self.B.shape[1]),np.zeros((B.T.shape))),axis=1) @ H_pseudo @ np.concatenate((B.T@P,np.concatenate((np.ones(B.shape),S@B), axis = 1)), axis=0) @ A
-            K = -np.concatenate((np.identity(self.B.shape[1]),np.zeros((B.T.shape))),axis=1) @ H_pseudo @ np.concatenate((B.T@P,S), axis=0) @ A
+            K = -np.concatenate((np.identity(self.B.shape[1]),np.zeros((self.B.T.shape))),axis=1) @ H_pseudo @ np.concatenate((self.B.T@P,S), axis=0) @ self.A
             
             K_seq.append(K)
             # compute S
-            S = S@(A+B@K)
+            S = S@(self.A+self.B@K)
             # compute P            
-            P = Q+K.T@R@K+(A+B@K)@P@(A+B@K)
+            P = Q+K.T@R@K+(self.A+self.B@K)@P@(self.A+self.B@K)
         # 0,1,...M-1
         K_seq.reverse()
-        K_p = np.zeros((B.shape[1],A.shape[1]))
+        K_p = np.zeros((self.B.shape[1],self.A.shape[1]))
         for j in range(M, self.N):
             K_seq.append(K_p)
         return K_seq
@@ -93,8 +99,8 @@ class TighteningMPC:
         u = cp.Variable((m,self.N+1))
         y = cp.Variable((q,self.N+1))        
         z = cp.Variable((p,self.N+1))
-        s = cp.Variable((N+1,))
-        c = np.ones((N+1,))
+        s = cp.Variable((self.N+1,))
+        c = np.ones((self.N+1,))
         cost = c.T@s
         # distance constraint
         constr_mpc = [s>=0]
@@ -154,8 +160,8 @@ if __name__ == "__main__":
     #print(mpc_policy.K)
     #mpc_policy.K = [np.array([[-0.5154,-1.1038]]),np.array([[-1,-1.5]]),np.array([[-0.4,-1.2]]),np.array([[0,0]]),np.array([[0,0]])]
     L = mpc_policy.recursion_l()
-    constr = mpc_policy.recursion_y()
-    target = mpc_policy.recursion_target()    
+    constr = mpc_policy.recursion_y(L)
+    target = mpc_policy.recursion_target(L)    
     #print([constr[j].b for j in range(len(constr))])
 
     # Get XF
@@ -169,12 +175,12 @@ if __name__ == "__main__":
     # XF = polytope(AF,bF)
 
     # T step evolution    
-    T = 20
+    T = 9
     x1_list = [x0[0]]
     x2_list = [x0[1]]
     t_list = [0]
     # Get disturbance for T steps
-    w_candidate = 0.2*np.random.random((2,20))-0.1
+    w_candidate = 0.2*np.random.random((2,T))-0.1
     #print(w_candidate)
     for t in range(T):        
         # MPC control policy
@@ -201,7 +207,7 @@ if __name__ == "__main__":
     fig.savefig('x1.png')
 
     fig1 = plt.figure(1)
-    plt.plot(t_list,x1_list)
+    plt.plot(t_list,x2_list)
     plt.ylabel("x2", fontsize = 12)
     plt.xlabel("time" , fontsize =12, labelpad = 10)
     plt.title("x2 evolution", fontsize = 17)
@@ -217,6 +223,64 @@ if __name__ == "__main__":
     plt.legend(loc = 'best')
     fig2.savefig('x1x2 traj.png')
 
+    # Iteration for 100 uncertainties
+    n_iter = 100
+    for i in range(n_iter):
+        # agent initialization
+        agent = Agent(A,B,C,D,E,F,x0,W)
+        # T step evolution    
+        T = 9
+        x1_list = [x0[0]]
+        x2_list = [x0[1]]
+        t_list = [0]    
+        # Get disturbance for T steps
+        w_candidate = 0.2*np.random.random((2,T))-0.1
+        #print(w_candidate)
+        for t in range(T):  
+            # MPC control policy
+            mpc_policy.state_update(agent.x)
+            u = mpc_policy.solve_mpc(target, constr, XF)        
+            #print(u)
+            # update with u_input
+            u_input = u[:,0]
+            #print(u_input)
+            agent.x = agent.update(u_input, w_candidate[:,t])
+            x1_list.append(agent.x[0])
+            x2_list.append(agent.x[1])
+            t_list.append(t+1)
+        # print("check")
+        # print(x1_list)
+        # print(agent.x)
+
+        fig = plt.figure(0)
+        plt.plot(t_list,x1_list)
+        plt.ylabel("x1", fontsize = 12)
+        plt.xlabel("time" , fontsize =12, labelpad = 10)
+        plt.title("x1 evolution", fontsize = 17)
+        plt.legend(loc = 'best')
+        #fig.savefig('x1_100.png')
+
+        fig1 = plt.figure(1)
+        plt.plot(t_list,x2_list)
+        plt.ylabel("x2", fontsize = 12)
+        plt.xlabel("time" , fontsize =12, labelpad = 10)
+        plt.title("x2 evolution", fontsize = 17)
+        plt.legend(loc = 'best')
+        #fig1.savefig('x2_100.png')
+
+
+        fig2 = plt.figure(2)
+        plt.plot(x1_list,x2_list)
+        plt.ylabel("x1", fontsize = 12)
+        plt.xlabel("x2" , fontsize =12, labelpad = 10)
+        plt.title("x1-x2 evolution", fontsize = 17)
+        plt.legend(loc = 'best')
+        #fig2.savefig('x1x2 traj_100.png')
+
+
+    fig.savefig('x1_100_t9.png')
+    fig1.savefig('x2_100_t9.png')
+    fig2.savefig('x1x2 traj_100_t9.png')
 
 
 
