@@ -30,16 +30,22 @@ class TighteningMPC:
     def recursion_l(self):
         L_cur = np.identity((self.A.shape[0]))
         L = [L_cur]
-        for i in range(self.N):            
-            L_cur = (self.A+self.B@self.K[i])@L_cur
+        for i in range(self.N):  
+            #print("L cur {}, {}\n".format(L_cur, i))          
+            L_cur = np.round((self.A+self.B@self.K[i])@L_cur,3)
             L.append(L_cur)
         return L
     def recursion_target(self,L):     
         target_cur = self.target_init
         target = [target_cur]
         for i in range(self.N):
+            #print("(E+FK)L, K {}, \n, {}".format(np.round((self.E + self.F @ self.K[i])@L[i],2),self.K[i]))
             W_temp = multiplication(self.W,(self.E + self.F @ self.K[i])@L[i])
+            print("wtemp\n")
+            print(np.round(W_temp.A,2),np.round(W_temp.b,2))
             target_cur = pontryagin_diff(target_cur,W_temp)
+            print("target_cur")
+            print(target_cur.A,target_cur.b)
             target.append(target_cur)
         return target
     def recursion_y(self,L):
@@ -48,12 +54,16 @@ class TighteningMPC:
         for i in range(self.N):
             # print("w, (c+dk)l\n")
             # print(self.W.A, (self.C + self.D @ self.K[i])@L[i])
-            W_temp = multiplication(self.W,(self.C + self.D @ self.K[i])@L[i])
+            # print("(C+DK)L, K {}, \n, {}".format(np.round((self.C + self.D @ self.K[i])@L[i],2),self.K[i]))
+            W_temp = multiplication(self.W,np.round((self.C + self.D @ self.K[i])@L[i],2))
+
             # print("wtemp\n")
             # print(W_temp.A,W_temp.b)
             # print("constr")
             # print(constr_cur.A,constr_cur.b)
             constr_cur = pontryagin_diff(constr_cur,W_temp)
+            #print("wtemp {},{}".format(W_temp.A,W_temp.b))
+            # print("constrcut,i {},{},{} \n".format(constr_cur.A,constr_cur.b,i))
             constr.append(constr_cur)
             # print("\n")
         return constr
@@ -111,6 +121,7 @@ class TighteningMPC:
         for j in range(self.N+1):
             constr_mpc += [x[:,j+1] == self.A@x[:,j]+self.B@u[:,j]]
             constr_mpc += [y[:,j] == self.C@x[:,j]+self.D@u[:,j]]
+            constr_mpc += [z[:,j] == self.E@x[:,j]+self.F@u[:,j]]
         # constr constraint
         for j in range(self.N+1):
             constr_mpc += [constr[j].A@y[:,j]<=constr[j].b]
